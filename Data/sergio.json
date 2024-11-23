@@ -1,0 +1,12 @@
+[
+    {
+        "deadline": 12,
+        "duration": 24,
+        "group_size": 4,
+        "group_work": true,
+        "name": "Final Project",
+        "size": 1,
+        "subject": "Programming",
+        "weight": 30.0
+    }
+]
