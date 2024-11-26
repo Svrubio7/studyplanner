@@ -5,6 +5,9 @@
 #include <queue>
 #include <algorithm>
 #include <iterator>
+#include <iomanip>
+#include <ctime>
+#include <sstream>
 
 // Use the nlohmann JSON namespace
 using json = nlohmann::json;
@@ -45,6 +48,45 @@ std::vector<Planner::AssignmentPtr> Planner::loadFromFile(const std::string& fil
     }
 
     return assignments;
+}
+
+void Planner::addToICSFile(const std::string& icsFilePath, const std::string& assignmentName, int dayOffset, int hour) {
+    std::ofstream icsFile(icsFilePath, std::ios::app);
+
+    if (!icsFile.is_open()) {
+        std::cerr << "Error: Could not open ICS file for writing.\n";
+        return;
+    }
+
+    // Get the current date
+    std::time_t now = std::time(nullptr);
+    std::tm* timeInfo = std::localtime(&now);
+
+    // Add the day offset and set the event start and end times
+    timeInfo->tm_mday += dayOffset;
+    timeInfo->tm_hour = 18 + hour;  // Start time: 6 PM + scheduled hour
+    timeInfo->tm_min = 0;
+    timeInfo->tm_sec = 0;
+    std::time_t startTime = std::mktime(timeInfo);
+
+    timeInfo->tm_hour += 1;  // End time: 1 hour after start
+    std::time_t endTime = std::mktime(timeInfo);
+
+    // Convert start and end times to the required format
+    char startBuffer[16], endBuffer[16];
+    std::strftime(startBuffer, sizeof(startBuffer), "%Y%m%dT%H%M%S", std::localtime(&startTime));
+    std::strftime(endBuffer, sizeof(endBuffer), "%Y%m%dT%H%M%S", std::localtime(&endTime));
+
+    // Write the event details to the ICS file
+    icsFile << "BEGIN:VEVENT\n";
+    icsFile << "SUMMARY:" << assignmentName << "\n";
+    icsFile << "DTSTART:" << startBuffer << "\n";
+    icsFile << "DTEND:" << endBuffer << "\n";
+    icsFile << "DESCRIPTION:Scheduled Assignment\n";
+    icsFile << "STATUS:CONFIRMED\n";
+    icsFile << "END:VEVENT\n";
+
+    icsFile.close();
 }
 
 void Planner::saveToFile(const std::string& filename, const std::vector<AssignmentPtr>& assignments) {
@@ -119,57 +161,61 @@ int Planner::calculatePriority(const Assignment& assignment, int studyHoursPerDa
 }
 
 // Scheduler implementation using a priority queue
-void Planner::scheduler(const std::vector<AssignmentPtr>& assignments, int weekdayStudyHours, int weekendStudyHours) {
-    // Copy assignments to work with a modifiable list
+void Planner::scheduler(const std::vector<AssignmentPtr>& assignments, int weekdayStudyHours, int weekendStudyHours, const std::string& userName) {
+    // Define the ICS file path based on the user name
+    std::string icsFilePath = "Data/" + userName + "_schedule.ics";
+
+    // Ensure the ICS file starts with a proper calendar header
+    std::ofstream icsFile(icsFilePath, std::ios::trunc);
+    if (icsFile.is_open()) {
+        icsFile << "BEGIN:VCALENDAR\n";
+        icsFile << "VERSION:2.0\n";
+        icsFile << "PRODID:-//Planner App//EN\n";
+        icsFile.close();
+    } else {
+        std::cerr << "Error: Could not create ICS file.\n";
+        return;
+    }
+
     std::vector<AssignmentPtr> assignmentList(assignments);
-    int day = 1; // Track the day
+    int day = 1;
 
     while (!assignmentList.empty()) {
-        std::cout << "Day " << day << ":\n";
-
-        // Determine study hours for the day
         int studyHours = (day % 6 == 0 || day % 7 == 0) ? weekendStudyHours : weekdayStudyHours;
-
-        // Priority queue to sort assignments by priority (max-heap)
         auto compare = [](const AssignmentPtr& a, const AssignmentPtr& b) {
-            return a->getPriority() < b->getPriority(); // Higher priority first
+            return a->getPriority() < b->getPriority();
         };
         std::priority_queue<AssignmentPtr, std::vector<AssignmentPtr>, decltype(compare)> priorityQueue(compare);
 
-        // Calculate priorities and populate the queue
         for (const auto& assignment : assignmentList) {
             int priority = calculatePriority(*assignment, studyHours);
-            assignment->setPriority(priority); // Update the priority
+            assignment->setPriority(priority);
             priorityQueue.push(assignment);
         }
 
-        // Use all study hours in the day
         for (int i = 0; i < studyHours; ++i) {
             if (priorityQueue.empty())
                 break;
 
-            // Get the highest-priority assignment
             auto currentAssignment = priorityQueue.top();
             priorityQueue.pop();
 
             std::cout << "Hour " << (i + 1) << ": " << currentAssignment->getName() << "\n";
-
-            // Work on the assignment
             currentAssignment->decreaseDuration(1);
 
-            // If the assignment is completed, remove it from the list
+            // Add the scheduled assignment to the ICS file
+            addToICSFile(icsFilePath, currentAssignment->getName(), day, i);
+
             if (currentAssignment->getRealDuration() <= 0) {
                 auto it = std::find(assignmentList.begin(), assignmentList.end(), currentAssignment);
                 if (it != assignmentList.end())
                     assignmentList.erase(it);
             } else {
-                // Recalculate and reinsert into the queue
                 currentAssignment->setPriority(calculatePriority(*currentAssignment, studyHours));
                 priorityQueue.push(currentAssignment);
             }
         }
 
-        // Reduce the deadline for all assignments
         for (auto it = assignmentList.begin(); it != assignmentList.end();) {
             (*it)->decreaseDeadline(1);
             if ((*it)->getDeadline() <= 0) {
@@ -182,4 +228,12 @@ void Planner::scheduler(const std::vector<AssignmentPtr>& assignments, int weekd
 
         ++day;
     }
+
+    // Add the ICS footer
+    icsFile.open(icsFilePath, std::ios::app);
+    if (icsFile.is_open()) {
+        icsFile << "END:VCALENDAR\n";
+        icsFile.close();
+    }
 }
+

@@ -159,7 +159,9 @@ int main() {
                 std::cout << "Enter weekend study hours: ";
                 std::cin >> weekendHours;
 
-                Planner::scheduler(assignments, weekdayHours, weekendHours);
+                // Pass the user name to the scheduler
+                Planner::scheduler(assignments, weekdayHours, weekendHours, name);
+                std::cout << "Schedule saved to Data/" << name << "_schedule.ics\n";
                 break;
             }
             case 4: {
