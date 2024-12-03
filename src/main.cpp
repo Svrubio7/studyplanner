@@ -1,24 +1,19 @@
 #include <iostream>
 #include <limits>
-#include <vector>
-#include <memory>
-#include <fstream>
 #include <string>
-#include <filesystem>
+#include <sqlite3.h>
 #include "../include/assignment.hpp"
 #include "../include/planner.hpp"
 #include "../include/displayfunctions.hpp"
+#include "Assignments_DB.hpp"
+#include <experimental/filesystem>
 
-// Check if user data file exists
-bool userExists(const std::string& filename) {
-    std::ifstream file(filename);
-    return file.is_open();
-}
+namespace fs = std::experimental::filesystem;
 
-// Ensure the Data directory exists
+// Ensure the Data directory exists:
 void ensureDataDirectoryExists() {
-    if (!std::filesystem::exists("Data")) {
-        if (!std::filesystem::create_directory("Data")) {
+    if (!fs::exists("Data")) {
+        if (!fs::create_directory("Data")) {
             std::cerr << "Error: Could not create 'Data' directory.\n";
             exit(1); // Exit if unable to create the directory
         }
@@ -26,36 +21,23 @@ void ensureDataDirectoryExists() {
 }
 
 int main() {
-    // Ensure the Data directory exists
+    const std::string dbName = "assignments.db";
+
+    // Ensure the Data directory exists:
     ensureDataDirectoryExists();
 
-    // Greeting and user setup
+    // Initialize the database and create the Assignments table:
+    Database::initialize(dbName);
+    Database::createAssignmentTable(dbName);
+
+    // Greeting username and welcome message:
     std::cout << "Enter your name: ";
     std::string name;
     std::cin >> name;
 
-    // Define the user file path
-    std::string userFile = "Data/" + name + ".json";
+    std::cout << "Welcome, " << name << "!\n";
 
-    // Check if the user file exists
-    if (!userExists(userFile)) {
-        // Create the file directly
-        std::ofstream MyFile(userFile);
-        if (!MyFile) {
-            std::cerr << "Error: Could not create the file for the user at: " << userFile << "\n";
-            return 1;
-        }
-        MyFile << "[]"; // Initialize the file with an empty JSON array
-        MyFile.close();
-        std::cout << "Welcome, " << name << "! A new file has been created for you.\n";
-    } else {
-        std::cout << "Welcome back, " << name << "!\n";
-    }
-
-    // Load assignments
-    std::vector<Planner::AssignmentPtr> assignments = Planner::loadFromFile(userFile);
-
-    // Main menu loop
+    // Main menu loop:
     while (true) {
         std::cout << "\nMain Menu:\n";
         std::cout << "1. Add an Assignment\n";
@@ -68,9 +50,9 @@ int main() {
         int choice;
         std::cin >> choice;
 
-        // Input validation
+        // Input validation:
         if (std::cin.fail() || choice < 1 || choice > 5) {
-            std::cin.clear(); // Clear the input buffer
+            std::cin.clear(); // Clear the input buffer.
             std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
             std::cout << "Invalid choice. Please try again.\n";
             continue;
@@ -78,10 +60,10 @@ int main() {
 
         switch (choice) {
             case 1: {
-                // Adding an assignment
-                std::string subject, name;
+                // Adding an assignment - Collect details from the user:
+                std::string subject, assignmentName;
                 int deadline, duration, size, groupSize;
-                float weight;
+                double weight;
                 bool groupWork;
 
                 std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
@@ -90,14 +72,14 @@ int main() {
                 std::cout << "Subject: ";
                 std::getline(std::cin, subject);
                 std::cout << "Name: ";
-                std::getline(std::cin, name);
+                std::getline(std::cin, assignmentName);
                 std::cout << "Deadline (in days): ";
                 std::cin >> deadline;
                 std::cout << "Duration (in hours): ";
                 std::cin >> duration;
                 std::cout << "Weight (as a percentage): ";
                 std::cin >> weight;
-                std::cout << "Size Big/Medium/Small (1/2/3): ";
+                std::cout << "Size (Big/Medium/Small - 1/2/3): ";
                 std::cin >> size;
                 std::cout << "Group Work (1 for Yes, 0 for No): ";
                 std::cin >> groupWork;
@@ -109,72 +91,41 @@ int main() {
                     groupSize = 1;
                 }
 
-                auto newAssignment = std::make_shared<Assignment>(subject, name, deadline, duration, weight, size, groupWork, groupSize);
-                assignments.push_back(newAssignment);
-
-                // Save changes to the file
-                Planner::saveToFile(userFile, assignments);
+                Database::addAssignment(dbName, subject, assignmentName, deadline, duration, weight, size, groupWork, groupSize);
 
                 std::cout << "Assignment added successfully.\n";
                 break;
             }
             case 2: {
-                // Deleting an assignment
-                if (assignments.empty()) {
-                    std::cout << "No assignments to delete.\n";
-                    break;
-                }
+                // Deleting an assignment by its ID - Collect ID from the user:
+                std::cout << "Enter the ID of the assignment to delete: ";
+                int id;
+                std::cin >> id;
 
-                std::cout << "Select the assignment to delete:\n";
-                for (size_t i = 0; i < assignments.size(); ++i) {
-                    std::cout << i + 1 << ". " << assignments[i]->getName() << "\n";
-                }
-                std::cout << "Enter your choice: ";
-
-                size_t deleteIndex;
-                std::cin >> deleteIndex;
-
-                if (deleteIndex > 0 && deleteIndex <= assignments.size()) {
-                    assignments.erase(assignments.begin() + (deleteIndex - 1));
-
-                    // Save changes to the file
-                    Planner::saveToFile(userFile, assignments);
-
-                    std::cout << "Assignment deleted successfully.\n";
-                } else {
-                    std::cout << "Invalid choice.\n";
-                }
+                Database::deleteAssignment(dbName, id);
+                std::cout << "Assignment deleted successfully.\n";
                 break;
             }
             case 3: {
-                // Run priority-based scheduler
-                if (assignments.empty()) {
-                    std::cout << "No assignments to schedule.\n";
-                    break;
-                }
-
+                // Run priority-based scheduler - Collect study hours from the user (weekday & weekend):
                 int weekdayHours, weekendHours;
                 std::cout << "Enter weekday study hours: ";
                 std::cin >> weekdayHours;
                 std::cout << "Enter weekend study hours: ";
                 std::cin >> weekendHours;
 
-                // Pass the user name to the scheduler
-                Planner::scheduler(assignments, weekdayHours, weekendHours, name);
+                Planner::scheduler({}, weekdayHours, weekendHours, name);
                 std::cout << "Schedule saved to Data/" << name << "_schedule.ics\n";
                 break;
             }
             case 4: {
-                // Display options menu
-                DisplayFunctions::displayMenu(assignments);
+                // Display options menu:
+                DisplayFunctions::displayMenu({});
                 break;
             }
             case 5: {
-                // Exit program
+                // Exit program:
                 std::cout << "Goodbye!\n";
-
-                // Save changes before exiting
-                Planner::saveToFile(userFile, assignments);
                 return 0;
             }
         }

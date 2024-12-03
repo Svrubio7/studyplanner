@@ -2,65 +2,71 @@
 #define ASSIGNMENT_HPP
 
 #include <string>
-#include <iostream>
+#include <tuple>
 
 class Assignment {
 private:
+    int id; // Unique ID to each assignment for database integration
     std::string subject;
     std::string name;
-    int deadline; // Remaining days to complete the assignment
-    int duration; // Total required hours to complete the assignment
-    float weight; // Importance of the assignment
-    int size; // Size of the assignment or team (if group work)
-    bool groupWork; // Indicates if the assignment is group work
-    int groupSize; // Number of members in the group
+    int deadline;     // Remaining days to complete the assignment
+    int duration;     // Total required hours to complete the assignment
+    double weight;    // Grade wight of the assignment (percentage)
+    int size;         // Size of the assignment - (Big/Medium/Small) with int representation (1/2/3)
+    bool groupWork;   // Indicates if the assignment is group work or not
+    int groupSize;    // If GW - number of members in the group
     int realDuration; // Duration adjusted for group size
-    int priority; // Priority score for scheduling
+    int priority;     // Priority score for scheduling
 
 public:
-    // Default constructor
+    // Default constructor:
     Assignment();
 
-    // Parameterized constructor
+    // Parameterized constructor:
     Assignment(const std::string& subject, const std::string& name, int deadline, int duration,
-               float weight, int size, bool groupWork, int groupSize);
+               double weight, int size, bool groupWork, int groupSize);
 
-    // Copy constructor
+    // Copy constructor:
     Assignment(const Assignment& other);
 
-    // Move constructor
+    // Move constructor:
     Assignment(Assignment&& other) noexcept;
 
-    // Copy assignment operator
+    // Copy assignment operator:
     Assignment& operator=(const Assignment& other);
 
-    // Move assignment operator
+    // Move assignment operator:
     Assignment& operator=(Assignment&& other) noexcept;
 
-    // Destructor
+    // Destructor:
     ~Assignment();
 
-    // Setters and Getters for Priority
+    // SQLite integration methods:
+    void fromSQLiteRow(int id, const std::string& subject, const std::string& name, int deadline, 
+                       int duration, double weight, int size, int groupWork, int groupSize);
+    std::tuple<std::string, std::string, int, int, double, int, int, int> toSQLiteRow() const;
+
+    // Setters and Getters for priority:
     void setPriority(int priority);
     int getPriority() const;
 
-    // State modification methods
-    void decreaseDuration(int hours); // Decrease remaining duration
-    void decreaseDeadline(int days); // Decrease remaining deadline
+    // Getter for the assignment ID:
+    int getID() const;
 
-    // Getters for private members
+    // Table modification methods:
+    void decreaseDuration(int hours); // Decrease remaining duration
+    void decreaseDeadline(int days);  // Decrease remaining deadline
+
+    // Getters for private members:
     const std::string& getSubject() const;
     const std::string& getName() const;
     int getDeadline() const;
     int getDuration() const;
-    float getWeight() const;
+    double getWeight() const;
     int getSize() const;
     bool isGroupWork() const;
     int getGroupSize() const;
     int getRealDuration() const;
-
-    // Display function
-    void display() const;
 };
 
 #endif // ASSIGNMENT_HPP

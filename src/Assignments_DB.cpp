@@ -2,6 +2,7 @@
 #include <sqlite3.h>
 #include <iostream>
 
+// Initialize the SQLite database:
 void Database::initialize(const std::string& dbName) {
     sqlite3* db;
     if (sqlite3_open(dbName.c_str(), &db) == SQLITE_OK) {
@@ -12,6 +13,7 @@ void Database::initialize(const std::string& dbName) {
     sqlite3_close(db);
 }
 
+// Create the Assignments table in the database:
 void Database::createAssignmentTable(const std::string& dbName) {
     sqlite3* db;
     sqlite3_open(dbName.c_str(), &db);
@@ -41,6 +43,7 @@ void Database::createAssignmentTable(const std::string& dbName) {
     sqlite3_close(db);
 }
 
+// Add an assignment to the database:
 void Database::addAssignment(
     const std::string& dbName, 
     const std::string& subject, 
@@ -67,7 +70,7 @@ void Database::addAssignment(
         return;
     }
 
-    // Bind the values to the statement
+    // Bind the values to the statement: 
     sqlite3_bind_text(stmt, 1, subject.c_str(), -1, SQLITE_STATIC);
     sqlite3_bind_text(stmt, 2, name.c_str(), -1, SQLITE_STATIC);
     sqlite3_bind_int(stmt, 3, deadline);
@@ -77,7 +80,7 @@ void Database::addAssignment(
     sqlite3_bind_int(stmt, 7, groupWork ? 1 : 0);
     sqlite3_bind_int(stmt, 8, groupSize);
 
-    // Execute the statement
+    // Execute the statement: Insert the data into the table
     if (sqlite3_step(stmt) != SQLITE_DONE) {
         std::cerr << "Error inserting data: " << sqlite3_errmsg(db) << std::endl;
     } else {
@@ -87,6 +90,7 @@ void Database::addAssignment(
 }
 
 
+// Show all assignments currently in the database:
 void Database::showAllAssignments(const std::string& dbName) {
     sqlite3* db;
     sqlite3_open(dbName.c_str(), &db);
@@ -123,22 +127,46 @@ void Database::showAllAssignments(const std::string& dbName) {
     sqlite3_close(db);
 }
 
-int main() {
-    const std::string dbName = "assignments.db";
+// Delete an assignment from the database:
+void Database::deleteAssignment(const std::string& dbName, int assignmentId) {
+    sqlite3* db;
+    sqlite3_open(dbName.c_str(), &db);
+    std::string sql = "DELETE FROM Assignments WHERE id = ?;";
+    sqlite3_stmt* stmt;
 
-    // Initialize the database
-    Database::initialize(dbName);
+    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, assignmentId);
+        if (sqlite3_step(stmt) != SQLITE_DONE) {
+            std::cerr << "Error deleting data: " << sqlite3_errmsg(db) << std::endl;
+        } else {
+            std::cout << "Assignment deleted successfully from database.\n";
+        }
+    }
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+}
 
-    // Create the Assignments table
-    Database::createAssignmentTable(dbName);
+// Update the duration of an assignment in the database:
+void Database::updateAssignmentDuration(const std::string& dbName, int id, int newDuration) {
+    sqlite3* db;
+    sqlite3_open(dbName.c_str(), &db);
 
-    // Add sample assignments
-    Database::addAssignment(dbName, "Math", "Algebra Homework", 5, 10, 20.5, 2, true, 3);
-    Database::addAssignment(dbName, "Science", "Physics Lab", 3, 8, 15.0, 1, false, 1);
-    Database::addAssignment(dbName, "History", "WWII Essay", 7, 5, 10.0, 3, false, 1);
+    std::string sql = "UPDATE Assignments SET duration = ? WHERE id = ?;";
+    sqlite3_stmt* stmt;
 
-    // Show all assignments
-    Database::showAllAssignments(dbName);
+    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, newDuration); // Bind the new duration
+        sqlite3_bind_int(stmt, 2, id);          // Bind the ID
 
-    return 0;
+        if (sqlite3_step(stmt) != SQLITE_DONE) {
+            std::cerr << "Error updating assignment duration: " << sqlite3_errmsg(db) << std::endl;
+        } else {
+            std::cout << "Successfully updated assignment duration for ID: " << id << std::endl;
+        }
+    } else {
+        std::cerr << "Error preparing update statement: " << sqlite3_errmsg(db) << std::endl;
+    }
+
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
 }
