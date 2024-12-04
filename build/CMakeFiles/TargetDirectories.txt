@@ -1,4 +1,0 @@
-/Users/triniroca/Desktop/project/studyplanner/build/CMakeFiles/main_program.dir
-/Users/triniroca/Desktop/project/studyplanner/build/CMakeFiles/runTests.dir
-/Users/triniroca/Desktop/project/studyplanner/build/CMakeFiles/edit_cache.dir
-/Users/triniroca/Desktop/project/studyplanner/build/CMakeFiles/rebuild_cache.dir
