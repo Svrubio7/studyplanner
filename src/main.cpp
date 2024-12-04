@@ -171,7 +171,7 @@ int main() {
                         std::cin >> weekendHours;
 
                         Planner::scheduler(assignments, weekdayHours, weekendHours, name);
-                        std::cout << "Schedule saved to Data/" << name << "_schedule.ics\n";
+                        std::cout << "\nSchedule saved to Data/" << name << "_schedule.ics\n";
                         break;
                     }
                     case 4: {
