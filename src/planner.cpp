@@ -181,6 +181,7 @@ void Planner::scheduler(const std::vector<AssignmentPtr>& assignments, int weekd
     int day = 1;
 
     while (!assignmentList.empty()) {
+        std::cout << "\nDay " << day << ":\n";
         int studyHours = (day % 6 == 0 || day % 7 == 0) ? weekendStudyHours : weekdayStudyHours;
         auto compare = [](const AssignmentPtr& a, const AssignmentPtr& b) {
             return a->getPriority() < b->getPriority();
